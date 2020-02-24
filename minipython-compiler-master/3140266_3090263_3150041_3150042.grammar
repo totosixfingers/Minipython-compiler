@@ -1,0 +1,237 @@
+/* Φωτης Αρωνης 3140266
+   Αντρεας Ιασονας Σοφιας 3090263
+   Λεωνιδας Εκατοματης 3150041
+   Θεοδωρος Εξαδακτυλος 3150042 */
+   
+Package minipython;
+
+Helpers
+	digit = ['0' .. '9'];
+	letter = ['a' .. 'z']|['A' .. 'Z']; 
+	cr = 13; 
+	lf = 10;
+	space = 32;
+	hashtag = '#';
+	single_quote = ''';
+	double_quote = '"';
+	all = [0..127]; 
+	eol = lf | cr | cr lf ;
+	not_eol = [all - [cr + lf]]; 
+
+Tokens
+	tab = 9;
+	none = 'None';
+	plus = '+';
+	minus = '-';
+	meq = '-=';
+	deq ='/=';
+	assert = 'assert';
+	pp = '++';
+	mm = '--';
+	per = '%';
+	mult = '*';
+	dmult = '**';
+	div = '/';
+	equal = '=';
+	exclam = '!';
+	dictt = 'dict';
+	def = 'def';
+	logic_plus = '&&';
+	l_par = '(';
+	r_par = ')';
+	l_br = '[';
+	r_br = ']';
+	comma=',';
+	and = 'and';
+	dot = '.';
+	qmark = '?';
+	gqmark = ';';
+	if = 'if';
+	in = 'in';
+	elif = 'elif';
+	else = 'else';
+	while = 'while';
+	for = 'for';
+	print = 'print';
+	return = 'return'; 
+	less = '<';
+	great = '>';
+	geq = '>=';
+	leq = '<=';
+	neq = '!=';
+	eq = '==';
+	not = 'not';
+	or = 'or';
+	true = 'true';
+	semi = ':';
+	false = 'false';
+	quote = '"';
+	blank = (space | lf | cr);
+	line_comment = hashtag not_eol* eol; 
+	number = digit+ | (digit+ '.' digit+);
+	id = letter (letter | digit)*;
+	string = '"'not_eol* '"' | single_quote not_eol* single_quote | double_quote not_eol* double_quote;
+
+Ignored Tokens
+	blank, line_comment;
+	
+Productions
+
+        goal = commands* {-> New goal([commands])};
+
+	commands = {function} function {-> New commands.function(function)} |
+				{statement} statement{-> New commands.statement(statement)};
+	
+	function ={def_arg} def id l_par argument? r_par semi statement
+                    {-> New function.def_arg(id, argument, statement)};
+	
+	argument = {argument} id arg1? arg2* {-> New argument.argument(id, arg1, [arg2])};
+	
+	arg1 = {arg1} equal value{-> New arg1.arg1(value)};
+	
+	arg2 = {arg2} comma id arg1?{-> New arg2.arg2(id,arg1)};
+	
+	statement ={if}tab* if  comper_end semi statement{-> New statement.if(comper_end.comparison,statement)} |
+	            {while}tab* while comper_end semi statement{-> New statement.while(comper_end.comparison,statement)}|
+				{for}tab* for [id1]:id in [id2]:id semi statement{-> New statement.for(id1,id2,statement)}|
+				{return}tab* return expression{-> New statement.return(expression)}|
+				{print}tab* print expression commaexp*{-> New statement.print(expression,[commaexp])}|
+				{equal}tab* id equal expression{-> New statement.equal(id,expression)}|
+				{meq}tab* id meq expression{-> New statement.meq(id,expression)}|
+				{deq}tab* id deq expression{-> New statement.deq(id,expression)}|
+				{brackets}tab* id l_br [ex1]:expression r_br equal [ex2]:expression{-> New statement.brackets(id,ex1,ex2)}|
+				{assert}tab* assert expression commaexp?{-> New statement.assert(expression,commaexp)}|
+				{function_call}tab* function_call{-> New statement.function_call(function_call)};
+
+    comper_end {-> comparison}={comper} comper {-> comper.comparison}|
+	           {not} not comparison {-> New comparison.not(comparison)}|	
+               {and} [c1]:comparison and [c2]:comparison {-> New comparison.and(c1,c2)}|
+               {or} [c1]:comparison or [c2]:comparison{-> New comparison.or(c1,c2)};
+	
+    comparison {-> comparison}={comper} comper {-> comper.comparison};
+
+    comper {-> comparison}={expression} expression {-> New comparison.expression(expression)}|
+	     {true} true {-> New comparison.true(true)}|
+	     {false} false {-> New comparison.false(false)}|
+	     {lessc} [lpar]:expression less [rpar]:expression {-> New comparison.lessc(lpar,rpar)}|
+	     {greatc}[lpar]:expression great [rpar]:expression{-> New comparison.greatc(lpar,rpar)}|
+	      {geq} [ex1]:expression geq [ex2]:expression {-> New comparison.geq(ex1,ex2)}| 
+              {leq} [ex1]:expression leq [ex2]:expression {-> New comparison.leq(ex1,ex2)}|
+             {neq} [ex1]:expression neq [ex2]:expression {-> New comparison.neq(ex1,ex2)}|	
+              {eq} [ex1]:expression eq [ex2]:expression {-> New comparison.eq(ex1,ex2)};	
+	
+	
+    expression {-> expression} ={multiplication} multiplication {-> multiplication.expression} |
+				{addition} expression plus multiplication {-> New expression.addition(expression,multiplication.expression)}|
+				{subtraction} expression minus multiplication {-> New expression.subtraction(expression,multiplication.expression)};
+					
+    multiplication {-> expression} ={power} power {-> power.expression} |
+		    {mult} multiplication mult power {-> New expression.mult(multiplication.expression,power.expression)}|
+                    {div} multiplication div power{-> New expression.div(multiplication.expression,power.expression)}|
+                    {per} multiplication per power{-> New expression.per(multiplication.expression,power.expression)};	
+                          						  
+    power {-> expression} = {pre_fix} pre_fix {-> pre_fix.expression}|
+			    {power}power dmult pre_fix {-> New expression.power(power.expression,pre_fix.expression)};
+
+    pre_fix {-> expression} =   {id_val_par} exprend {-> exprend.expression} |
+				{pre_aug} pp id_val {-> New expression.pre_aug(id_val.expression)}|
+				{pre_dec} mm id_val {-> New expression.pre_dec(id_val.expression)}|
+				{post_aug} id_val pp {-> New expression.post_aug(id_val.expression)}|
+				{post_dec} id_val mm {-> New expression.post_dec(id_val.expression)};
+    
+    id_val {-> expression}={identifier} id {-> New expression.identifier(id)}|
+	                   {id_expr}id l_br expression r_br {-> New expression.id_expr(id,expression)};
+		   
+    exprend {-> expression}={function_call} function_call {-> New expression.function_call(function_call)}|
+				  {id_val} id_val {-> id_val.expression}|
+                                  {value} value {-> New expression.value(value)}|
+				  {val} l_br value commaval* r_br {-> New expression.val(value,[commaval])}|
+				  {expr} l_par expression r_par {-> New expression.expr(expression)};
+				  
+				  
+		
+    commaval = {commaval} comma value {-> New commaval.commaval(value)};
+	
+	function_call ={function_call} id l_par arglist? r_par {-> New function_call.function_call(id,arglist)};	
+	
+	arglist = {arglist} expression commaexp* {-> New arglist.arglist(expression,[commaexp])};
+	
+	commaexp = {commaexp} comma expression {-> New commaexp.commaexp(expression)};	
+	
+	value = {function_call} id dot function_call {-> New value.function_call(id,function_call)}|
+			{number} number|
+			{string} string|
+		    {none} none;
+		
+Abstract Syntax Tree
+
+	goal = commands*;
+
+	commands = {function} function |
+				{statement} statement;
+	
+        function ={def_arg} id argument statement;
+ 
+        argument = {argument} id arg1 arg2*;
+
+	arg1 = {arg1} value;
+	
+	arg2 = {arg2} id arg1?;
+
+       statement ={if}comparison statement |
+	            {while}comparison statement|
+				{for} [id1]:id [id2]:id statement|
+				{return} expression|
+				{print} expression commaexp*|
+				{equal} id expression|
+				{meq} id expression|
+				{deq} id expression|
+				{brackets} id [ex1]:expression [ex2]:expression|
+				{assert} expression commaexp|
+				{function_call} function_call;	
+	
+   comparison={not} comparison|	
+               {and} [c1]:comparison [c2]:comparison|
+               {or} [c1]:comparison [c2]:comparison |
+               {expression} expression|
+	       {true} true|
+	       {false} false|
+	       {lessc} [lpar]:expression [rpar]:expression|
+	       {greatc} [lpar]:expression [rpar]:expression|
+	       {geq} [ex1]:expression [ex2]:expression| 
+               {leq} [ex1]:expression [ex2]:expression|
+               {neq} [ex1]:expression [ex2]:expression|	
+               {eq} [ex1]:expression [ex2]:expression;
+
+
+    expression = {addition} [first_expression]:expression [following_expression]:expression|
+		 {subtraction} [first_expression]:expression [following_expression]:expression|
+		 {mult} [first_expression]:expression [following_expression]:expression|
+                 {div} [first_expression]:expression [following_expression]:expression|
+                 {per} [first_expression]:expression [following_expression]:expression|	
+                 {power} [first_expression]:expression [following_expression]:expression|
+		 {pre_aug}  expression|
+		 {pre_dec}  expression|
+		 {post_aug}  expression|
+		 {post_dec}  expression|
+                 {identifier} id|
+	         {id_expr}id expression |
+		 {function_call} function_call|
+                 {value} value|
+		 {val} value commaval*|
+		 {expr} expression;
+				  
+				  
+		
+    commaval = {commaval} value;
+	
+	function_call ={function_call} id arglist;	
+	
+	arglist = {arglist} expression commaexp*;
+	
+	commaexp = {commaexp}expression;	
+	
+	value = {function_call} id function_call|
+		{number} number|
+		{string} string|
+		{none} none;
